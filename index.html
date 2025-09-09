@@ -3,30 +3,22 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>やさしいドットタイマー（一画面フィット）</title>
+  <title>やさしいドットタイマー（オートスクロール）</title>
   <style>
-    :root{
-      --dot-size: 40;   /* 基準ドット(px) - 実サイズはscaleで調整 */
-      --gap: 10;        /* 基準すき間(px) */
-      --scale: 1;       /* 自動計算した拡大縮小率 */
-    }
+    :root{ --dot-size:40px; --gap:10px; }
     *{ box-sizing:border-box }
     html,body{ height:100%; }
     body{
       margin:0;
       font-family:"Rounded Mplus 1c","Hiragino Maru Gothic ProN",sans-serif;
       background:#fffbe6; color:#222;
-      overflow:hidden; /* スクロールさせない */
-    }
-    .app{
-      min-height:100svh; /* アドレスバー高さ変動に強い */
-      display:flex; flex-direction:column;
+      /* ← スクロールOKに */
+      overflow:auto;
       padding: calc(env(safe-area-inset-top) + 8px) 12px calc(env(safe-area-inset-bottom) + 8px);
-      gap:8px;
     }
-    h1{ font-size:1.2rem; margin:0; color:#d17b00; text-align:center }
-    .topBar{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center }
-    label{ font-weight:600; }
+    h1{ font-size:1.2rem; margin:0 0 8px; color:#d17b00; text-align:center }
+    .bar{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center }
+    label{ font-weight:600 }
     input[type=number]{
       font-size:1.1rem; width:110px; padding:8px 10px; border-radius:12px;
       border:2px solid #ffa726; text-align:center; background:#fff;
@@ -36,30 +28,27 @@
       background:#ff9800; color:#fff; cursor:pointer; box-shadow:2px 2px 4px rgba(0,0,0,.2)
     }
     button.secondary{ background:#8d6e63 }
-    .statusRow{
-      display:flex; justify-content:center; gap:12px; align-items:center;
-      font-size:1.05rem; min-height:1.8em; text-align:center;
-    }
+    .status{ display:flex; justify-content:center; gap:12px; align-items:center;
+             font-size:1.05rem; min-height:1.8em; text-align:center; margin:8px 0 12px }
     .done{ font-weight:700; color:#2e7d32; }
 
-    /* グリッド領域は余り高さすべてを使い、内部をscaleでフィットさせる */
+    /* ドット領域：スクロール可能に */
     .gridWrap{
-      flex:1 1 auto;
-      display:flex; justify-content:center; align-items:flex-start;
-      overflow:hidden; /* はみ出しを見せない */
+      max-width:1000px; margin:0 auto;
+      border-radius:12px; background:#fff7df; padding:12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+      max-height: 70vh;            /* 画面の7割高さに収めて、外はページスクロール */
+      overflow:auto;               /* ← ここでスクロール可能 */
+      scroll-behavior: smooth;     /* JSのscrollIntoViewと相性◎ */
     }
     .dots{
-      --dsz: calc(var(--dot-size) * 1px);
-      --ggp: calc(var(--gap) * 1px);
       display:grid;
-      grid-template-columns: repeat(10, var(--dsz)); /* 10列固定で“10のまとまり”を守る */
-      gap: var(--ggp);
-      transform: scale(var(--scale));
-      transform-origin: top center;
-      will-change: transform;
+      grid-template-columns: repeat(10, var(--dot-size));
+      gap: var(--gap);
+      justify-content:center;
     }
     .dot{
-      width:var(--dsz); height:var(--dsz); border-radius:50%;
+      width:var(--dot-size); height:var(--dot-size); border-radius:50%;
       background:#4caf50; border:2px solid #2e7d32;
       transition:opacity .2s, background .2s, border-color .2s;
     }
@@ -67,7 +56,7 @@
     .dot:nth-child(10n+1){ outline:2px dashed rgba(0,0,0,0.15); outline-offset:-4px }
 
     @media (max-width:480px){
-      :root{ --gap: 6; } /* モバイルは隙間を少し詰める */
+      :root{ --dot-size:28px; --gap:6px }
     }
     @media (prefers-reduced-motion: reduce){
       .dot{ transition:none !important; }
@@ -75,32 +64,33 @@
   </style>
 </head>
 <body>
-  <div class="app">
-    <h1>やさしいドットタイマー</h1>
+  <h1>やさしいドットタイマー</h1>
 
-    <div class="topBar" role="radiogroup" aria-label="モード選択">
-      <label><input type="radio" name="mode" value="down" checked> 減る（カウントダウン）</label>
-      <label><input type="radio" name="mode" value="up"> ふえる（カウントアップ）</label>
-      <label for="count">ドット数</label>
-      <input id="count" type="number" min="1" max="3600" value="30" />
-      <button id="start">▶スタート</button>
-      <button id="pause" class="secondary">⏸一時停止</button>
-      <button id="reset" class="secondary">🔄リセット</button>
-    </div>
+  <div class="bar" role="radiogroup" aria-label="モード選択">
+    <label><input type="radio" name="mode" value="down" checked> 減る（カウントダウン）</label>
+    <label><input type="radio" name="mode" value="up"> ふえる（カウントアップ）</label>
+  </div>
 
-    <div class="statusRow" aria-live="polite">
-      <div><span id="label">残りドット</span>：<strong id="primaryNumber">30</strong></div>
-      <div class="done" id="doneText"></div>
-    </div>
+  <div class="bar">
+    <label for="count">ドット数</label>
+    <input id="count" type="number" min="1" max="3600" value="60" />
+    <button id="start">▶スタート</button>
+    <button id="pause" class="secondary">⏸一時停止</button>
+    <button id="reset" class="secondary">🔄リセット</button>
+  </div>
 
-    <div class="gridWrap" id="gridWrap">
-      <div class="dots" id="dots" aria-label="ドット表示領域"></div>
-    </div>
+  <div class="status" aria-live="polite">
+    <div><span id="label">残りドット</span>：<strong id="primaryNumber">60</strong></div>
+    <div class="done" id="doneText"></div>
+  </div>
+
+  <div class="gridWrap" id="gridWrap">
+    <div class="dots" id="dots" aria-label="ドット表示領域"></div>
   </div>
 
   <script>
     (function(){
-      const dots = document.getElementById('dots');
+      const dotsEl = document.getElementById('dots');
       const wrap = document.getElementById('gridWrap');
       const countInput = document.getElementById('count');
       const startBtn = document.getElementById('start');
@@ -111,12 +101,12 @@
       const doneEl = document.getElementById('doneText');
       const modeRadios = document.querySelectorAll('input[name="mode"]');
 
-      let total = norm(parseInt(countInput.value,10) || 30);
+      let total = clamp(parseInt(countInput.value,10) || 60);
       let mode = getMode();
       let timer = null;
       let nextIndex = (mode==='down') ? total-1 : 0;
 
-      // WebAudio（3回ビープ用）
+      // WebAudio（3回ビープ）
       let audioCtx = null;
       function ensureAudio(){
         try{
@@ -128,65 +118,61 @@
         }catch(e){}
       }
 
-      function norm(v){ return Math.max(1, Math.min(3600, v)); }
+      function clamp(v){ return Math.max(1, Math.min(3600, v)); }
       function getMode(){ return (Array.from(modeRadios).find(r=>r.checked)?.value)||'down'; }
 
       function buildDots(n){
-        dots.innerHTML = '';
+        dotsEl.innerHTML = '';
         const startHidden = (mode==='up');
         for(let i=0;i<n;i++){
           const el = document.createElement('span');
           el.className = 'dot' + (startHidden ? ' hidden' : '');
           el.setAttribute('data-index', i);
-          dots.appendChild(el);
+          dotsEl.appendChild(el);
         }
         if(mode==='down'){ labelEl.textContent='残りドット'; primaryEl.textContent=n; nextIndex=n-1; }
         else{ labelEl.textContent='経過ドット'; primaryEl.textContent=0; nextIndex=0; }
         doneEl.textContent = '';
-        fitToScreen(); // ← ここで一画面フィット
+
+        // 初期スクロール位置：次に変化するドットを見せる
+        scrollToIndex(nextIndex, {instant:true});
       }
 
-      // ■ 一画面フィット：10列固定のままグリッド全体をscaleでズーム
-      function fitToScreen(){
-        const cols = 10;
-        const rows = Math.ceil(total / cols);
-        const baseDot = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dot-size')) || 40;
-        const baseGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 10;
-
-        const reqW = cols*baseDot + (cols-1)*baseGap;
-        const reqH = rows*baseDot + (rows-1)*baseGap;
-
-        const availW = wrap.clientWidth;
-        const availH = wrap.clientHeight;
-
-        // 1より大きく拡大はしない（見た目を破壊しないため）
-        const s = Math.min(availW/reqW, availH/reqH, 1);
-        document.documentElement.style.setProperty('--scale', String(s));
+      // 進行に合わせて自動スクロール
+      function scrollToIndex(idx, {instant=false}={}){
+        const target = dotsEl.querySelector('.dot[data-index="'+idx+'"]');
+        if(!target) return;
+        // wrap（スクロールコンテナ）基準でnearestに
+        target.scrollIntoView({block:'nearest', inline:'nearest', behavior: instant?'auto':'smooth'});
       }
 
       function tick(){
         if(mode==='down'){
           if(nextIndex<0){ stopTimer(); return; }
-          const dot = dots.querySelector('.dot[data-index="'+nextIndex+'"]');
+          const dot = dotsEl.querySelector('.dot[data-index="'+nextIndex+'"]');
           if(dot) dot.classList.add('hidden');
           nextIndex--;
           const remain = Math.max(0, nextIndex+1);
           primaryEl.textContent = remain;
           if(remain===0) finish();
+          else scrollToIndex(nextIndex); // 次に変化する位置へ追従
         }else{
           if(nextIndex>=total){ stopTimer(); return; }
-          const dot = dots.querySelector('.dot[data-index="'+nextIndex+'"]');
+          const dot = dotsEl.querySelector('.dot[data-index="'+nextIndex+'"]');
           if(dot) dot.classList.remove('hidden');
           nextIndex++;
           const elapsed = Math.min(total, nextIndex);
           primaryEl.textContent = elapsed;
           if(elapsed>=total) finish();
+          else scrollToIndex(nextIndex); // 次に変化する位置へ追従
         }
       }
 
       function startTimer(){
         if(timer) return;
         ensureAudio();
+        // スタート時点でも現在のターゲットへ寄せる
+        scrollToIndex(nextIndex);
         timer = setInterval(tick, 1000);
       }
       function stopTimer(){ if(timer){ clearInterval(timer); timer=null; } }
@@ -197,7 +183,7 @@
         playAlarm3();
       }
 
-      // ■ 必ず3回鳴るビープ（0.6s間隔 ×3）
+      // 0.6秒間隔 × 3回ビープ
       function playAlarm3(){
         try{
           ensureAudio();
@@ -213,20 +199,20 @@
             osc.connect(gain); gain.connect(audioCtx.destination);
             osc.start(t); osc.stop(t+0.25);
           }
-        }catch(e){ /* 無音よりマシなので無視 */ }
+        }catch(e){ /* フォールバック不要なら黙ってOK */ }
       }
 
-      // 事件
+      // 操作
       startBtn.addEventListener('click', startTimer);
       pauseBtn.addEventListener('click', stopTimer);
       resetBtn.addEventListener('click', ()=>{
         stopTimer();
-        total = norm(parseInt(countInput.value,10)||30);
+        total = clamp(parseInt(countInput.value,10)||60);
         mode = getMode();
         buildDots(total);
       });
       countInput.addEventListener('change', ()=>{
-        total = norm(parseInt(countInput.value,10)||1);
+        total = clamp(parseInt(countInput.value,10)||1);
         countInput.value = total;
         mode = getMode();
         buildDots(total);
@@ -235,9 +221,6 @@
         mode = getMode();
         buildDots(total);
       }));
-
-      window.addEventListener('resize', fitToScreen);
-      window.addEventListener('orientationchange', ()=> setTimeout(fitToScreen, 50));
       window.addEventListener('keydown', (e)=>{
         if(e.code==='Space'){ e.preventDefault(); if(timer) stopTimer(); else startTimer(); }
       });
