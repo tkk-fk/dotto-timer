@@ -2,232 +2,244 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>やさしいドットタイマー</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>やさしいドットタイマー（一画面フィット）</title>
   <style>
-    :root{ --dot-size:40px; --gap:10px; }
+    :root{
+      --dot-size: 40;   /* 基準ドット(px) - 実サイズはscaleで調整 */
+      --gap: 10;        /* 基準すき間(px) */
+      --scale: 1;       /* 自動計算した拡大縮小率 */
+    }
+    *{ box-sizing:border-box }
+    html,body{ height:100%; }
     body{
+      margin:0;
       font-family:"Rounded Mplus 1c","Hiragino Maru Gothic ProN",sans-serif;
-      padding:24px; background:#fffbe6; color:#222; text-align:center
+      background:#fffbe6; color:#222;
+      overflow:hidden; /* スクロールさせない */
     }
-    h1{ font-size:1.6rem; margin:0 0 16px; color:#d17b00 }
-    .controls, .mode{
-      display:flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-bottom:12px
+    .app{
+      min-height:100svh; /* アドレスバー高さ変動に強い */
+      display:flex; flex-direction:column;
+      padding: calc(env(safe-area-inset-top) + 8px) 12px calc(env(safe-area-inset-bottom) + 8px);
+      gap:8px;
     }
-    label{ font-weight:600 }
-    input[type=number]{ font-size:1.2rem; width:120px; padding:10px; border-radius:12px;
-      border:2px solid #ffa726; text-align:center }
-    button{ font-size:1.2rem; padding:12px 20px; border-radius:16px; border:0;
-      background:#ff9800; color:#fff; cursor:pointer; box-shadow:2px 2px 4px rgba(0,0,0,.2) }
+    h1{ font-size:1.2rem; margin:0; color:#d17b00; text-align:center }
+    .topBar{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center }
+    label{ font-weight:600; }
+    input[type=number]{
+      font-size:1.1rem; width:110px; padding:8px 10px; border-radius:12px;
+      border:2px solid #ffa726; text-align:center; background:#fff;
+    }
+    button{
+      font-size:1.1rem; padding:10px 16px; border-radius:14px; border:0;
+      background:#ff9800; color:#fff; cursor:pointer; box-shadow:2px 2px 4px rgba(0,0,0,.2)
+    }
     button.secondary{ background:#8d6e63 }
-    button:active{ transform:scale(0.95) }
-    .status{ font-size:1.3rem; margin:8px 0 12px; color:#333 }
-    .done{ font-size:1.6rem; font-weight:700; color:#2e7d32; min-height:1.6em }
+    .statusRow{
+      display:flex; justify-content:center; gap:12px; align-items:center;
+      font-size:1.05rem; min-height:1.8em; text-align:center;
+    }
+    .done{ font-weight:700; color:#2e7d32; }
+
+    /* グリッド領域は余り高さすべてを使い、内部をscaleでフィットさせる */
+    .gridWrap{
+      flex:1 1 auto;
+      display:flex; justify-content:center; align-items:flex-start;
+      overflow:hidden; /* はみ出しを見せない */
+    }
     .dots{
-      display:grid; grid-template-columns: repeat(10, var(--dot-size));
-      gap:var(--gap); max-width:95%; margin:0 auto; justify-content:center
+      --dsz: calc(var(--dot-size) * 1px);
+      --ggp: calc(var(--gap) * 1px);
+      display:grid;
+      grid-template-columns: repeat(10, var(--dsz)); /* 10列固定で“10のまとまり”を守る */
+      gap: var(--ggp);
+      transform: scale(var(--scale));
+      transform-origin: top center;
+      will-change: transform;
     }
     .dot{
-      width:var(--dot-size); height:var(--dot-size); border-radius:50%;
+      width:var(--dsz); height:var(--dsz); border-radius:50%;
       background:#4caf50; border:2px solid #2e7d32;
-      transition:opacity .25s, transform .25s, background .25s, border-color .25s
+      transition:opacity .2s, background .2s, border-color .2s;
     }
-    /* 消えた（未達成）状態：明度差と枠で判別しやすく */
-    .dot.hidden{ background:#cfd8dc; border-color:#90a4ae; opacity:0.7 }
-    /* 10のまとまりの視覚手がかり（先頭に薄い破線枠） */
+    .dot.hidden{ background:#cfd8dc; border-color:#90a4ae; opacity:0.75; }
     .dot:nth-child(10n+1){ outline:2px dashed rgba(0,0,0,0.15); outline-offset:-4px }
-    .info{ margin-top:14px; font-size:1.05rem; color:#555 }
-    footer{ margin-top:20px; color:#888; font-size:0.9rem }
-    @media (max-width:420px){ :root{ --dot-size:28px; --gap:6px } }
+
+    @media (max-width:480px){
+      :root{ --gap: 6; } /* モバイルは隙間を少し詰める */
+    }
     @media (prefers-reduced-motion: reduce){
       .dot{ transition:none !important; }
     }
   </style>
 </head>
 <body>
-  <h1>やさしいドットタイマー</h1>
+  <div class="app">
+    <h1>やさしいドットタイマー</h1>
 
-  <div class="mode" role="radiogroup" aria-label="モード選択">
-    <label><input type="radio" name="mode" value="down" checked> 減る（カウントダウン）</label>
-    <label><input type="radio" name="mode" value="up"> ふえる（カウントアップ）</label>
+    <div class="topBar" role="radiogroup" aria-label="モード選択">
+      <label><input type="radio" name="mode" value="down" checked> 減る（カウントダウン）</label>
+      <label><input type="radio" name="mode" value="up"> ふえる（カウントアップ）</label>
+      <label for="count">ドット数</label>
+      <input id="count" type="number" min="1" max="3600" value="30" />
+      <button id="start">▶スタート</button>
+      <button id="pause" class="secondary">⏸一時停止</button>
+      <button id="reset" class="secondary">🔄リセット</button>
+    </div>
+
+    <div class="statusRow" aria-live="polite">
+      <div><span id="label">残りドット</span>：<strong id="primaryNumber">30</strong></div>
+      <div class="done" id="doneText"></div>
+    </div>
+
+    <div class="gridWrap" id="gridWrap">
+      <div class="dots" id="dots" aria-label="ドット表示領域"></div>
+    </div>
   </div>
-
-  <div class="controls">
-    <label for="count">ドット数</label>
-    <input id="count" type="number" min="1" max="3600" value="30" />
-    <button id="start">▶スタート</button>
-    <button id="pause" class="secondary">⏸一時停止</button>
-    <button id="reset" class="secondary">🔄リセット</button>
-  </div>
-
-  <div class="status" id="statusLine"><span id="label">残りドット</span>：<strong id="primaryNumber">30</strong></div>
-  <div class="done" id="doneText" aria-live="polite"></div>
-
-  <div class="dots" id="dots" aria-live="polite" aria-label="ドット表示領域"></div>
-
-  <div class="info">
-    ▶で はじまる / ⏸で とまる / スペースキーでも開始・停止できます。<br>
-    終了時はアラームが<strong>3回</strong>鳴ります。
-  </div>
-  <footer>このファイルを保存してブラウザで開いてください。</footer>
 
   <script>
     (function(){
-      const dotsContainer = document.getElementById('dots');
+      const dots = document.getElementById('dots');
+      const wrap = document.getElementById('gridWrap');
       const countInput = document.getElementById('count');
       const startBtn = document.getElementById('start');
       const pauseBtn = document.getElementById('pause');
       const resetBtn = document.getElementById('reset');
       const labelEl = document.getElementById('label');
-      const primaryNumberEl = document.getElementById('primaryNumber');
-      const doneText = document.getElementById('doneText');
+      const primaryEl = document.getElementById('primaryNumber');
+      const doneEl = document.getElementById('doneText');
       const modeRadios = document.querySelectorAll('input[name="mode"]');
 
       let total = norm(parseInt(countInput.value,10) || 30);
-      let timer = null;
       let mode = getMode();
-      let nextIndex = (mode === 'down') ? total - 1 : 0; // down: 隠す方向, up: 見せる方向
-      let audioCtx = null; // WebAudio
+      let timer = null;
+      let nextIndex = (mode==='down') ? total-1 : 0;
 
-      function norm(v){ return Math.max(1, Math.min(3600, v)); }
-
-      function getMode(){
-        const checked = Array.from(modeRadios).find(r => r.checked);
-        return checked ? checked.value : 'down';
+      // WebAudio（3回ビープ用）
+      let audioCtx = null;
+      function ensureAudio(){
+        try{
+          if(!audioCtx){
+            const Ctx = window.AudioContext || window.webkitAudioContext;
+            if(Ctx) audioCtx = new Ctx();
+          }
+          audioCtx?.resume?.();
+        }catch(e){}
       }
 
+      function norm(v){ return Math.max(1, Math.min(3600, v)); }
+      function getMode(){ return (Array.from(modeRadios).find(r=>r.checked)?.value)||'down'; }
+
       function buildDots(n){
-        dotsContainer.innerHTML = '';
-        // カウントアップは「最初ぜんぶhidden（灰）」→進むほど緑が増える
-        const startHidden = (mode === 'up');
+        dots.innerHTML = '';
+        const startHidden = (mode==='up');
         for(let i=0;i<n;i++){
           const el = document.createElement('span');
           el.className = 'dot' + (startHidden ? ' hidden' : '');
           el.setAttribute('data-index', i);
-          dotsContainer.appendChild(el);
+          dots.appendChild(el);
         }
-        // 表示ラベル
-        if(mode === 'down'){
-          labelEl.textContent = '残りドット';
-          primaryNumberEl.textContent = n;
-          nextIndex = n - 1;
-        }else{
-          labelEl.textContent = '経過ドット';
-          primaryNumberEl.textContent = 0;
-          nextIndex = 0;
-        }
-        doneText.textContent = '';
+        if(mode==='down'){ labelEl.textContent='残りドット'; primaryEl.textContent=n; nextIndex=n-1; }
+        else{ labelEl.textContent='経過ドット'; primaryEl.textContent=0; nextIndex=0; }
+        doneEl.textContent = '';
+        fitToScreen(); // ← ここで一画面フィット
       }
 
-      function updateUIAfterStep(){
-        if(mode === 'down'){
-          const remaining = Math.max(0, nextIndex + 1);
-          primaryNumberEl.textContent = remaining;
-          if(remaining === 0){ finish(); }
-        }else{
-          const elapsed = Math.min(total, nextIndex);
-          primaryNumberEl.textContent = elapsed;
-          if(elapsed >= total){ finish(); }
-        }
+      // ■ 一画面フィット：10列固定のままグリッド全体をscaleでズーム
+      function fitToScreen(){
+        const cols = 10;
+        const rows = Math.ceil(total / cols);
+        const baseDot = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dot-size')) || 40;
+        const baseGap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--gap')) || 10;
+
+        const reqW = cols*baseDot + (cols-1)*baseGap;
+        const reqH = rows*baseDot + (rows-1)*baseGap;
+
+        const availW = wrap.clientWidth;
+        const availH = wrap.clientHeight;
+
+        // 1より大きく拡大はしない（見た目を破壊しないため）
+        const s = Math.min(availW/reqW, availH/reqH, 1);
+        document.documentElement.style.setProperty('--scale', String(s));
       }
 
       function tick(){
-        if(mode === 'down'){
-          if(nextIndex < 0){ stopTimer(); return; }
-          const dot = dotsContainer.querySelector('.dot[data-index="'+nextIndex+'"]');
-          if(dot){ dot.classList.add('hidden'); }
+        if(mode==='down'){
+          if(nextIndex<0){ stopTimer(); return; }
+          const dot = dots.querySelector('.dot[data-index="'+nextIndex+'"]');
+          if(dot) dot.classList.add('hidden');
           nextIndex--;
+          const remain = Math.max(0, nextIndex+1);
+          primaryEl.textContent = remain;
+          if(remain===0) finish();
         }else{
-          if(nextIndex >= total){ stopTimer(); return; }
-          const dot = dotsContainer.querySelector('.dot[data-index="'+nextIndex+'"]');
-          if(dot){ dot.classList.remove('hidden'); }
+          if(nextIndex>=total){ stopTimer(); return; }
+          const dot = dots.querySelector('.dot[data-index="'+nextIndex+'"]');
+          if(dot) dot.classList.remove('hidden');
           nextIndex++;
+          const elapsed = Math.min(total, nextIndex);
+          primaryEl.textContent = elapsed;
+          if(elapsed>=total) finish();
         }
-        updateUIAfterStep();
       }
 
       function startTimer(){
         if(timer) return;
-        // 初回開始時にAudioContextを解放（iOSの制約対策）
-        try{
-          if(!audioCtx){
-            const Ctx = window.AudioContext || window.webkitAudioContext;
-            if(Ctx){ audioCtx = new Ctx(); }
-          }
-          audioCtx?.resume?.();
-        }catch(e){}
+        ensureAudio();
         timer = setInterval(tick, 1000);
       }
-
-      function stopTimer(){
-        if(timer){ clearInterval(timer); timer = null; }
-      }
+      function stopTimer(){ if(timer){ clearInterval(timer); timer=null; } }
 
       function finish(){
         stopTimer();
-        doneText.textContent = 'おわり！';
-        playAlarm3(); // ← 3回確実に鳴らす
+        doneEl.textContent = 'おわり！';
+        playAlarm3();
       }
 
-      // WebAudioで3回ビープ（0.6秒間隔）
+      // ■ 必ず3回鳴るビープ（0.6s間隔 ×3）
       function playAlarm3(){
         try{
-          if(!audioCtx){
-            const Ctx = window.AudioContext || window.webkitAudioContext;
-            if(Ctx){ audioCtx = new Ctx(); }
-          }
-          if(!audioCtx) return; // 非対応なら諦め（ほぼ稀）
-
+          ensureAudio();
+          if(!audioCtx) return;
           const now = audioCtx.currentTime;
-          // 3発スケジュール（各0.25秒、間隔0.6秒）
           for(let i=0;i<3;i++){
-            const t = now + i * 0.6;
+            const t = now + i*0.6;
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.value = 880; // A5付近
+            osc.type='sine'; osc.frequency.value=880;
             gain.gain.setValueAtTime(0.0001, t);
-            gain.gain.exponentialRampToValueAtTime(0.3, t + 0.01);
-
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-
-            osc.start(t);
-            osc.stop(t + 0.25);
+            gain.gain.exponentialRampToValueAtTime(0.3, t+0.01);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(t); osc.stop(t+0.25);
           }
-        }catch(e){
-          // 最悪のフォールバック（無音になるよりマシ）
-          console.warn('Alarm fallback', e);
-        }
+        }catch(e){ /* 無音よりマシなので無視 */ }
       }
 
-      // Event bindings
+      // 事件
       startBtn.addEventListener('click', startTimer);
       pauseBtn.addEventListener('click', stopTimer);
       resetBtn.addEventListener('click', ()=>{
         stopTimer();
-        total = norm(parseInt(countInput.value,10) || 30);
+        total = norm(parseInt(countInput.value,10)||30);
         mode = getMode();
         buildDots(total);
       });
       countInput.addEventListener('change', ()=>{
-        total = norm(parseInt(countInput.value,10) || 1);
+        total = norm(parseInt(countInput.value,10)||1);
         countInput.value = total;
         mode = getMode();
         buildDots(total);
       });
-      modeRadios.forEach(r=>{
-        r.addEventListener('change', ()=>{
-          mode = getMode();
-          buildDots(total);
-        });
-      });
+      modeRadios.forEach(r => r.addEventListener('change', ()=>{
+        mode = getMode();
+        buildDots(total);
+      }));
 
+      window.addEventListener('resize', fitToScreen);
+      window.addEventListener('orientationchange', ()=> setTimeout(fitToScreen, 50));
       window.addEventListener('keydown', (e)=>{
-        if(e.code === 'Space'){
-          e.preventDefault();
-          if(timer) stopTimer(); else startTimer();
-        }
+        if(e.code==='Space'){ e.preventDefault(); if(timer) stopTimer(); else startTimer(); }
       });
 
       // 初期化
