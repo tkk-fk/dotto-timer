@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>やさしいドットタイマー（オートスクロール）</title>
+  <title>ドットタイマー</title>
   <style>
     :root{ --dot-size:40px; --gap:10px; }
     *{ box-sizing:border-box }
@@ -64,7 +64,7 @@
   </style>
 </head>
 <body>
-  <h1>やさしいドットタイマー</h1>
+  <h1>ドットタイマー</h1>
 
   <div class="bar" role="radiogroup" aria-label="モード選択">
     <label><input type="radio" name="mode" value="down" checked> 減る（カウントダウン）</label>
@@ -80,7 +80,7 @@
   </div>
 
   <div class="status" aria-live="polite">
-    <div><span id="label">残りドット</span>：<strong id="primaryNumber">60</strong></div>
+    <div><span id="label">残り</span>：<strong id="primaryNumber">60</strong></div>
     <div class="done" id="doneText"></div>
   </div>
 
