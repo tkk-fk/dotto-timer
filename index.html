@@ -12,7 +12,6 @@
       margin:0;
       font-family:"Rounded Mplus 1c","Hiragino Maru Gothic ProN",sans-serif;
       background:#fffbe6; color:#222;
-      /* ← スクロールOKに */
       overflow:auto;
       padding: calc(env(safe-area-inset-top) + 8px) 12px calc(env(safe-area-inset-bottom) + 8px);
     }
@@ -29,17 +28,17 @@
     }
     button.secondary{ background:#8d6e63 }
     .status{ display:flex; justify-content:center; gap:12px; align-items:center;
-             font-size:1.05rem; min-height:1.8em; text-align:center; margin:8px 0 12px }
+             font-size:1.05rem; min-height:1.8em; text-align:center; margin:8px 0 12px; flex-wrap:wrap }
     .done{ font-weight:700; color:#2e7d32; }
+    .mins{ color:#555; }
 
-    /* ドット領域：スクロール可能に */
     .gridWrap{
       max-width:1000px; margin:0 auto;
       border-radius:12px; background:#fff7df; padding:12px;
       box-shadow: 0 2px 8px rgba(0,0,0,.06);
-      max-height: 70vh;            /* 画面の7割高さに収めて、外はページスクロール */
-      overflow:auto;               /* ← ここでスクロール可能 */
-      scroll-behavior: smooth;     /* JSのscrollIntoViewと相性◎ */
+      max-height: 70vh;
+      overflow:auto;
+      scroll-behavior: smooth;
     }
     .dots{
       display:grid;
@@ -80,7 +79,11 @@
   </div>
 
   <div class="status" aria-live="polite">
-    <div><span id="label">残り</span>：<strong id="primaryNumber">60</strong></div>
+    <div>
+      <span id="label">残りドット</span>：<strong id="primaryNumber">60</strong>
+      <!-- 右隣に「あと◯分◯秒」 -->
+      <span class="mins" id="minsBox">（あと <strong id="minsText">1分00秒</strong>）</span>
+    </div>
     <div class="done" id="doneText"></div>
   </div>
 
@@ -99,6 +102,11 @@
       const labelEl = document.getElementById('label');
       const primaryEl = document.getElementById('primaryNumber');
       const doneEl = document.getElementById('doneText');
+
+      // 追加要素
+      const minsBox = document.getElementById('minsBox');
+      const minsText = document.getElementById('minsText');
+
       const modeRadios = document.querySelectorAll('input[name="mode"]');
 
       let total = clamp(parseInt(countInput.value,10) || 60);
@@ -134,15 +142,33 @@
         else{ labelEl.textContent='経過ドット'; primaryEl.textContent=0; nextIndex=0; }
         doneEl.textContent = '';
 
-        // 初期スクロール位置：次に変化するドットを見せる
+        updateMinutesUI();
         scrollToIndex(nextIndex, {instant:true});
       }
 
-      // 進行に合わせて自動スクロール
+      // 残り秒→「あと m分ss秒」
+      function getRemainingSeconds(){
+        if(mode==='down'){
+          return Math.max(0, nextIndex + 1);
+        }else{
+          return Math.max(0, total - Math.min(total, nextIndex));
+        }
+      }
+      function formatMinSec(sec){
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m}分${String(s).padStart(2,'0')}秒`;
+      }
+      function updateMinutesUI(){
+        const remainSec = getRemainingSeconds();
+        minsText.textContent = formatMinSec(remainSec);
+        minsBox.style.visibility = 'visible';
+      }
+
+      // 自動スクロール
       function scrollToIndex(idx, {instant=false}={}){
         const target = dotsEl.querySelector('.dot[data-index="'+idx+'"]');
         if(!target) return;
-        // wrap（スクロールコンテナ）基準でnearestに
         target.scrollIntoView({block:'nearest', inline:'nearest', behavior: instant?'auto':'smooth'});
       }
 
@@ -154,8 +180,9 @@
           nextIndex--;
           const remain = Math.max(0, nextIndex+1);
           primaryEl.textContent = remain;
+          updateMinutesUI();
           if(remain===0) finish();
-          else scrollToIndex(nextIndex); // 次に変化する位置へ追従
+          else scrollToIndex(nextIndex);
         }else{
           if(nextIndex>=total){ stopTimer(); return; }
           const dot = dotsEl.querySelector('.dot[data-index="'+nextIndex+'"]');
@@ -163,15 +190,15 @@
           nextIndex++;
           const elapsed = Math.min(total, nextIndex);
           primaryEl.textContent = elapsed;
+          updateMinutesUI();
           if(elapsed>=total) finish();
-          else scrollToIndex(nextIndex); // 次に変化する位置へ追従
+          else scrollToIndex(nextIndex);
         }
       }
 
       function startTimer(){
         if(timer) return;
         ensureAudio();
-        // スタート時点でも現在のターゲットへ寄せる
         scrollToIndex(nextIndex);
         timer = setInterval(tick, 1000);
       }
@@ -180,6 +207,7 @@
       function finish(){
         stopTimer();
         doneEl.textContent = 'おわり！';
+        updateMinutesUI(); // 0分0秒表示に
         playAlarm3();
       }
 
@@ -199,7 +227,7 @@
             osc.connect(gain); gain.connect(audioCtx.destination);
             osc.start(t); osc.stop(t+0.25);
           }
-        }catch(e){ /* フォールバック不要なら黙ってOK */ }
+        }catch(e){}
       }
 
       // 操作
